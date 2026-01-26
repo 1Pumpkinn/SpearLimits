@@ -1,0 +1,6 @@
+name: SpearLimits
+version: '1.0-SNAPSHOT'
+main: net.saturn.spearLimits.SpearLimits
+api-version: '1.21'
+load: STARTUP
+authors: [ ___Pumpkinn ]
