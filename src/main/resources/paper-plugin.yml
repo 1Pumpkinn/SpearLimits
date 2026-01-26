@@ -1,14 +1,9 @@
 name: SpearLimits
-version: '1.0-SNAPSHOT'
+version: '${version}'
 main: net.saturn.spearLimits.SpearLimits
 api-version: '1.21.11'
-load: STARTUP
 authors: [ ___Pumpkinn ]
-commands:
-  spearlimit:
-    description: Set the crafting limit for a spear type
-    usage: /spearlimit <spear_type> <limit>
-    permission: spearlimits.admin
+description: Plugin to limit spear crafting
 permissions:
   spearlimits.admin:
     description: Allows setting spear limits
