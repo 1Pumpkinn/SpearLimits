@@ -15,6 +15,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.CrafterCraftEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.inventory.CraftingInventory;
+import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -184,6 +185,57 @@ public final class SpearLimits extends JavaPlugin implements Listener {
         if (spearMaterials.containsKey(result.getType())) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler
+    public void onPrepareSmithing(PrepareSmithingEvent event) {
+        ItemStack result = event.getResult();
+        if (result == null || result.getType() == Material.AIR) return;
+
+        String spearType = spearMaterials.get(result.getType());
+        if (spearType == null) return;
+
+        int currentTotal = getGlobalCount(spearType);
+        int limit = spearLimits.getOrDefault(spearType, 5);
+
+        if (currentTotal >= limit) {
+            event.setResult(new ItemStack(Material.AIR));
+        }
+    }
+
+    @EventHandler
+    public void onSmithItem(SmithItemEvent event) {
+        ItemStack result = event.getInventory().getResult();
+        if (result == null || result.getType() == Material.AIR) return;
+
+        String spearType = spearMaterials.get(result.getType());
+        if (spearType == null) return;
+
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        Player player = (Player) event.getWhoClicked();
+
+        int currentTotal = getGlobalCount(spearType);
+        int limit = spearLimits.getOrDefault(spearType, 5);
+
+        if (currentTotal >= limit) {
+            event.setCancelled(true);
+            player.sendMessage(Component.text("The server-wide limit of ", NamedTextColor.RED)
+                    .append(Component.text(limit + " " + spearType, NamedTextColor.YELLOW))
+                    .append(Component.text(" spears has been reached!", NamedTextColor.RED)));
+            event.getInventory().setResult(new ItemStack(Material.AIR));
+            return;
+        }
+
+        // Success - increment the global count by 1 (smithing always produces 1)
+        incrementGlobalCount(spearType, 1);
+        
+        int newTotal = currentTotal + 1;
+        player.sendMessage(Component.text("Converted to ", NamedTextColor.GREEN)
+                .append(Component.text("1 " + spearType, NamedTextColor.YELLOW))
+                .append(Component.text(" spear! Server total: (", NamedTextColor.GREEN))
+                .append(Component.text(newTotal + "/" + limit, NamedTextColor.YELLOW))
+                .append(Component.text(")", NamedTextColor.GREEN)));
+        saveData();
     }
 
     @EventHandler

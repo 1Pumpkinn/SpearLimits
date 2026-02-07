@@ -1,0 +1,23 @@
+# SpearLimits Configuration
+
+# Global craft limits for each spear type
+limits:
+  wood: 5
+  stone: 5
+  copper: 5
+  gold: 5
+  iron: 5
+  diamond: 5
+  netherite: 5
+
+# Broadcasting settings for spear crafting announcements
+broadcasting:
+  enabled: true
+  spears:
+    - wood
+    - stone
+    - copper
+    - gold
+    - iron
+    - diamond
+    - netherite

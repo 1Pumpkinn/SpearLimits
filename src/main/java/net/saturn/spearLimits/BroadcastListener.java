@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.SmithItemEvent;
 import org.bukkit.inventory.ItemStack;
 
 public class BroadcastListener implements Listener {
@@ -31,6 +32,27 @@ public class BroadcastListener implements Listener {
                     .append(Component.text(spearType, NamedTextColor.YELLOW))
                     .append(Component.text(" spear!", NamedTextColor.GREEN));
             
+            plugin.getServer().broadcast(message);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSmithItem(SmithItemEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) return;
+        Player player = (Player) event.getWhoClicked();
+
+        ItemStack result = event.getInventory().getResult();
+        if (result == null) return;
+        
+        String spearType = plugin.getSpearType(result.getType());
+
+        if (spearType != null && plugin.isBroadcastingEnabled() && plugin.shouldBroadcast(spearType)) {
+            Component message = Component.text("[SpearLimits] ", NamedTextColor.GOLD)
+                    .append(Component.text(player.getName(), NamedTextColor.YELLOW))
+                    .append(Component.text(" converted a spear to ", NamedTextColor.GREEN))
+                    .append(Component.text(spearType, NamedTextColor.YELLOW))
+                    .append(Component.text("!", NamedTextColor.GREEN));
+
             plugin.getServer().broadcast(message);
         }
     }
