@@ -13,6 +13,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.CrafterCraftEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.*;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.SmithingInventory;
@@ -184,6 +186,44 @@ public final class SpearLimits extends JavaPlugin implements Listener {
         ItemStack result = event.getRecipe().getResult();
         if (spearMaterials.containsKey(result.getType())) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        for (ItemStack item : event.getPlayer().getInventory().getContents()) {
+            if (item != null && spearMaterials.containsKey(item.getType())) {
+                event.getPlayer().getInventory().remove(item);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerPickupItem(EntityPickupItemEvent event) {
+        if (!(event.getEntity() instanceof Player)) {
+            return;
+        }
+        ItemStack item = event.getItem().getItemStack();
+        if (spearMaterials.containsKey(item.getType())) {
+            event.setCancelled(true);
+            event.getItem().remove();
+        }
+    }
+
+    @EventHandler
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (event.getEntity().getKiller() != null && !(event.getEntity() instanceof Player)) {
+            List<Material> spearDrops = new ArrayList<>();
+            if (Material.WOODEN_SPEAR != null) spearDrops.add(Material.WOODEN_SPEAR);
+            if (Material.STONE_SPEAR != null) spearDrops.add(Material.STONE_SPEAR);
+            if (Material.IRON_SPEAR != null) spearDrops.add(Material.IRON_SPEAR);
+            if (Material.GOLDEN_SPEAR != null) spearDrops.add(Material.GOLDEN_SPEAR);
+
+            if (!spearDrops.isEmpty()) {
+                Random random = new Random();
+                Material droppedSpear = spearDrops.get(random.nextInt(spearDrops.size()));
+                event.getDrops().add(new ItemStack(droppedSpear));
+            }
         }
     }
 
