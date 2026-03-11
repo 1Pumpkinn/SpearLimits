@@ -16,9 +16,7 @@ import org.bukkit.event.block.CrafterCraftEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.*;
-import org.bukkit.inventory.CraftingInventory;
-import org.bukkit.inventory.SmithingInventory;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -191,11 +189,58 @@ public final class SpearLimits extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onInventoryOpen(InventoryOpenEvent event) {
-        for (ItemStack item : event.getPlayer().getInventory().getContents()) {
-            if (item != null && spearMaterials.containsKey(item.getType())) {
-                event.getPlayer().getInventory().remove(item);
+        Inventory inv = event.getInventory();
+        if (isTargetContainer(inv)) {
+            // Remove from player's inventory
+            for (ItemStack item : event.getPlayer().getInventory().getContents()) {
+                if (item != null && spearMaterials.containsKey(item.getType())) {
+                    event.getPlayer().getInventory().remove(item);
+                }
+            }
+            // Also remove from the container itself
+            for (ItemStack item : inv.getContents()) {
+                if (item != null && spearMaterials.containsKey(item.getType())) {
+                    inv.remove(item);
+                }
             }
         }
+    }
+
+    private boolean isTargetContainer(Inventory inventory) {
+        if (inventory == null) return false;
+        InventoryType type = inventory.getType();
+        
+        // Ender Chest is handled separately in onInventoryClick
+        if (type == InventoryType.ENDER_CHEST) return false;
+
+        String typeName = type.name();
+        // Standard types
+        if (typeName.equals("CHEST") || 
+            typeName.equals("BARREL") || 
+            typeName.contains("SHULKER_BOX")) {
+            return true;
+        }
+
+        // Custom containers (like copper chests) might use custom materials or holders
+        InventoryHolder holder = inventory.getHolder();
+        if (holder != null) {
+            // Check for DoubleChest holder (vanilla or custom)
+            if (holder.getClass().getSimpleName().contains("DoubleChest")) {
+                return true;
+            }
+
+            // Check block material
+            if (holder instanceof org.bukkit.block.BlockState) {
+                String matName = ((org.bukkit.block.BlockState) holder).getType().name();
+                if (matName.contains("CHEST") || 
+                    matName.contains("BARREL") || 
+                    matName.contains("SHULKER")) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     @EventHandler
@@ -207,6 +252,118 @@ public final class SpearLimits extends JavaPlugin implements Listener {
         if (spearMaterials.containsKey(item.getType())) {
             event.setCancelled(true);
             event.getItem().remove();
+        }
+    }
+
+    @EventHandler
+    public void onInventoryPickupItem(InventoryPickupItemEvent event) {
+        if (spearMaterials.containsKey(event.getItem().getItemStack().getType())) {
+            event.setCancelled(true);
+            event.getItem().remove();
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player)) {
+            return;
+        }
+
+        Inventory clickedInventory = event.getClickedInventory();
+        Inventory topInventory = event.getView().getTopInventory();
+        ItemStack currentItem = event.getCurrentItem();
+        Player player = (Player) event.getWhoClicked();
+
+        // 1. Handle Ender Chest (Drop logic as requested)
+        if (clickedInventory != null && clickedInventory.getType() == InventoryType.ENDER_CHEST &&
+            currentItem != null && spearMaterials.containsKey(currentItem.getType())) {
+
+            event.setCancelled(true);
+            clickedInventory.setItem(event.getSlot(), null);
+            player.getWorld().dropItemNaturally(player.getLocation(), currentItem);
+            return;
+        }
+
+        // Handle shift-click from Ender Chest
+        if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY &&
+            topInventory.getType() == InventoryType.ENDER_CHEST &&
+            clickedInventory == topInventory &&
+            currentItem != null && spearMaterials.containsKey(currentItem.getType())) {
+            
+            event.setCancelled(true);
+            clickedInventory.setItem(event.getSlot(), null);
+            player.getWorld().dropItemNaturally(player.getLocation(), currentItem);
+            return;
+        }
+
+        // 2. Handle Target Containers (Chest, Barrel, Shulker, Copper Chests, etc.)
+        if (isTargetContainer(clickedInventory) &&
+            currentItem != null && spearMaterials.containsKey(currentItem.getType())) {
+            
+            event.setCancelled(true);
+            clickedInventory.setItem(event.getSlot(), null); // Remove from container
+            return;
+        }
+
+        // Handle shift-click from Target Container
+        if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY &&
+            isTargetContainer(topInventory) &&
+            clickedInventory == topInventory &&
+            currentItem != null && spearMaterials.containsKey(currentItem.getType())) {
+            
+            event.setCancelled(true);
+            clickedInventory.setItem(event.getSlot(), null);
+            return;
+        }
+
+        // 3. Handle hotbar swap (pressing 1-9 while hovering over a slot)
+        if (event.getClick() == ClickType.NUMBER_KEY) {
+            // Check item in hotbar
+            ItemStack hotbarItem = player.getInventory().getItem(event.getHotbarButton());
+            
+            // If trying to swap a spear INTO a container
+            if (hotbarItem != null && spearMaterials.containsKey(hotbarItem.getType())) {
+                if (isTargetContainer(clickedInventory)) {
+                    event.setCancelled(true);
+                    player.getInventory().setItem(event.getHotbarButton(), null); // Remove from hotbar
+                    return;
+                } else if (clickedInventory != null && clickedInventory.getType() == InventoryType.ENDER_CHEST) {
+                    event.setCancelled(true);
+                    player.getInventory().setItem(event.getHotbarButton(), null);
+                    player.getWorld().dropItemNaturally(player.getLocation(), hotbarItem);
+                    return;
+                }
+            }
+            
+            // If trying to swap a spear OUT of a container
+            if (currentItem != null && spearMaterials.containsKey(currentItem.getType())) {
+                if (isTargetContainer(clickedInventory)) {
+                    event.setCancelled(true);
+                    clickedInventory.setItem(event.getSlot(), null); // Remove from container
+                    return;
+                } else if (clickedInventory != null && clickedInventory.getType() == InventoryType.ENDER_CHEST) {
+                    event.setCancelled(true);
+                    clickedInventory.setItem(event.getSlot(), null);
+                    player.getWorld().dropItemNaturally(player.getLocation(), currentItem);
+                    return;
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        Inventory topInv = event.getView().getTopInventory();
+        boolean isTarget = isTargetContainer(topInv);
+        boolean isEnder = topInv.getType() == InventoryType.ENDER_CHEST;
+
+        if (isTarget || isEnder) {
+            for (ItemStack item : event.getNewItems().values()) {
+                if (item != null && spearMaterials.containsKey(item.getType())) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
         }
     }
 
